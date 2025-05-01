@@ -48,7 +48,7 @@ if prompt := st.chat_input("What is up?"):
         with col2:
             cb = st.chat_message("user").checkbox(f"box{newid}", value=st.session_state[f"box{newid}"], key=f"check{newid}", on_change=flip, args=(newid,))
             st.write(st.session_state[f"box{newid}"])
-    st.session_state.messages.append({"role": "user", "content": prompt, "keyid": newid, "selected": cb})
+    st.session_state.messages.append({"role": "user", "content": prompt, "keyid": newid})
 
     # Display assistant response in chat message container
     with st.chat_message("assistant"):
