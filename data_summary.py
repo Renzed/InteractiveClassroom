@@ -12,5 +12,4 @@ df = pd.DataFrame({
 st.write("Here's our first attempt at using data to create a table:")
 st.write(df)
 
-if "messages" in st.session_state:
-    st.write(st.session_state.messages)
+st.write(st.session_state)
