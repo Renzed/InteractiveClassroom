@@ -6,6 +6,9 @@ st.write("Streamlit loves LLMs! 🤖 [Build your own chat app](https://docs.stre
 
 st.caption("Note that this demo app isn't actually connected to any LLMs. Those are expensive ;)")
 
+if not "ideas" in st.session_state:
+    st.session_state["ideas"] = set()
+
 # Initialize chat history
 if "messages" not in st.session_state:
     st.session_state.messages = [{"role": "assistant", "content": "Let's start chatting! 👇"}]
@@ -14,8 +17,10 @@ if "messages" not in st.session_state:
 def flip(id):
     if st.session_state[f"check{id}"]:
         st.session_state[f"box{id}"] = True
+        st.session_state["ideas"].add(id)
     else:
         st.session_state[f"box{id}"] = False
+        st.session_state["ideas"].remove(id)
 
 st.session_state["box0"] = False
 
@@ -23,11 +28,10 @@ st.session_state["box0"] = False
 for message in st.session_state.messages:
         if message["role"] == "user":
             with st.container():
-                col1, col2 = st.columns([8, 1])
+                col1, col2 = st.columns([8, 2])
                 with col1:
                     st.chat_message("user").write(message["content"])
-                with col2:
-                    st.chat_message("user").checkbox(f"box{message['keyid']}", value=st.session_state[f"box{message['keyid']}"], key=f"check{message['keyid']}", on_change=flip, args=(message['keyid'],))
+                col2.checkbox(f"Send idea", value=st.session_state[f"box{message['keyid']}"], key=f"check{message['keyid']}", on_change=flip, args=(message['keyid'],))
         else:
             with st.chat_message(message["role"]):
                 st.markdown(message["content"])
@@ -42,13 +46,11 @@ if prompt := st.chat_input("What is up?"):
         newid = 0
     st.session_state[f"box{newid}"] = False
     with st.container():
-        col1, col2 = st.columns([8,1])
+        col1, col2 = st.columns([8,2])
         with col1:
             st.chat_message("user").write(prompt)
-        with col2:
-            cb = st.chat_message("user").checkbox(f"box{newid}", value=st.session_state[f"box{newid}"], key=f"check{newid}", on_change=flip, args=(newid,))
-            st.write(st.session_state[f"box{newid}"])
-    st.session_state.messages.append({"role": "user", "content": prompt, "keyid": newid})
+        col2.checkbox(f"Send idea", value=st.session_state[f"box{newid}"], key=f"check{newid}", on_change=flip, args=(newid,))
+    st.session_state.messages.append({"role": "user", "content": prompt, "keyid": newid, "datetime": time.gmtime()})
 
     # Display assistant response in chat message container
     with st.chat_message("assistant"):
