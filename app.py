@@ -4,7 +4,6 @@ import re
 main_page = st.Page("data_summary.py", title="Samenvatting")
 input_page = st.Page("talk.py", title="Brainstorm")
 ideas_page = st.Page("ideas.py", title="Ideas")
-db = st.Page("dbtest.py", title="DB test")
 
 def valid_email(mailstr):
     return re.match(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$', mailstr)
