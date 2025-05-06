@@ -1,73 +1,82 @@
 import streamlit as st
-import random
 import time
+from psycopg2 import pool
+from google import genai
+from google.genai import types
+import json
+from io import StringIO
 
-st.write("Streamlit loves LLMs! 🤖 [Build your own chat app](https://docs.streamlit.io/develop/tutorials/llms/build-conversational-apps) in minutes, then make it powerful by adding images, dataframes, or even input widgets to the chat.")
+connection_string = st.secrets.connections.neon['url']
+conn_pool = pool.SimpleConnectionPool(1, 10, connection_string)
+conn = conn_pool.getconn()
+cur = conn.cursor()
+user_email = st.session_state.name.lower()
+cur.execute(f"SELECT * FROM chat_logs WHERE chat_logs.user = '{user_email}';")
+dblist = cur.fetchall()
+cur.execute(f"""SELECT "data" FROM system WHERE "id" = 1""")
+raw = cur.fetchone()[0]
+with open('system_instructions/' + raw['system_instruction'],'rb') as f:
+    system_instruction = f.read().decode("UTF-8")
 
-st.caption("Note that this demo app isn't actually connected to any LLMs. Those are expensive ;)")
+if len(dblist)==1:
+    cur.execute(f"""SELECT "messages" FROM chat_logs WHERE "user" = '{user_email}'""")
+    prev = cur.fetchone()[0]
+    st.session_state.messages = prev
+elif len(dblist)>1:
+    raise ValueError("Only one user can exist")
+else:
+    st.write("nog geen db entry")
+    cur.execute(f"""INSERT INTO chat_logs ("id", "user", "messages") VALUES (default, '{user_email}', '[]');""")
+    conn.commit()
+    if "messages" not in st.session_state:
+        st.session_state.messages = []
 
-if not "ideas" in st.session_state:
-    st.session_state["ideas"] = set()
+history = [types.Content(role=message["role"], parts=[types.Part(text=message["content"])]) for message in st.session_state.messages]
 
-# Initialize chat history
-if "messages" not in st.session_state:
-    st.session_state.messages = [{"role": "assistant", "content": "Let's start chatting! 👇"}]
+gemini_client = genai.Client(api_key=st.secrets.ai.gemini.key)
+gemini_chat = gemini_client.chats.create(
+    model=st.secrets.ai.gemini.model,
+    config=types.GenerateContentConfig(
+        system_instruction=system_instruction),
+    history=history
+)
 
 
-def flip(id):
-    if st.session_state[f"check{id}"]:
-        st.session_state[f"box{id}"] = True
-        st.session_state["ideas"].add(id)
-    else:
-        st.session_state[f"box{id}"] = False
-        st.session_state["ideas"].remove(id)
+def update_messages():
+    q = f"""UPDATE chat_logs SET "messages" = %s WHERE "user" = '{user_email}'"""
+    cur.execute(q, (json.dumps(st.session_state.messages),))
+    conn.commit()
 
-st.session_state["box0"] = False
+st.header("Let's brainstorm!")
+
+st.caption("")
+
 
 # Display chat messages from history on app rerun
 for message in st.session_state.messages:
-        if message["role"] == "user":
-            with st.container():
-                col1, col2 = st.columns([8, 2])
-                with col1:
-                    st.chat_message("user").write(message["content"])
-                col2.checkbox(f"Send idea", value=st.session_state[f"box{message['keyid']}"], key=f"check{message['keyid']}", on_change=flip, args=(message['keyid'],))
-        else:
-            with st.chat_message(message["role"]):
+        with st.chat_message(message["role"]):
                 st.markdown(message["content"])
 
 # Accept user input
 if prompt := st.chat_input("What is up?"):
     # Add user message to chat history
     # Display user message in chat message container
-    if "messages" in st.session_state:
-        newid = len(st.session_state.messages)
-    else:
-        newid = 0
-    st.session_state[f"box{newid}"] = False
-    with st.container():
-        col1, col2 = st.columns([8,2])
-        with col1:
-            st.chat_message("user").write(prompt)
-        col2.checkbox(f"Send idea", value=st.session_state[f"box{newid}"], key=f"check{newid}", on_change=flip, args=(newid,))
-    st.session_state.messages.append({"role": "user", "content": prompt, "keyid": newid, "datetime": time.gmtime()})
+    st.chat_message("user").write(prompt)
+    st.session_state.messages.append({"role": "user", "content": prompt, "datetime": time.gmtime()})
 
     # Display assistant response in chat message container
-    with st.chat_message("assistant"):
-        message_placeholder = st.empty()
+    with st.chat_message("model"):
         full_response = ""
-        assistant_response = random.choice(
-            [
-                "Hmm that could use some more work",
-                "That's an idea! Would you like me to send it to be collected?",
-            ]
-        )
-        # Simulate stream of response with milliseconds delay
-        for chunk in assistant_response.split():
-            full_response += chunk + " "
-            time.sleep(0.05)
-            # Add a blinking cursor to simulate typing
-            message_placeholder.markdown(full_response + "▌")
-        message_placeholder.markdown(full_response)
+        tokens_used = 0
+        message_placeholder = st.empty()
+        response = gemini_chat.send_message_stream(message=prompt)
+        for chunk in response:
+            full_response += chunk.text
+            message_placeholder.markdown(full_response)
+            tokens_used += chunk.usage_metadata.total_token_count
+        st.write(tokens_used)
     # Add assistant response to chat history
-    st.session_state.messages.append({"role": "assistant", "content": full_response})
+    st.session_state.messages.append({"role": "model", "content": full_response})
+    update_messages()
+
+# st.write(gemini_chat.get_history())
