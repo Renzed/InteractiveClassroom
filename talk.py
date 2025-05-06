@@ -4,7 +4,6 @@ from psycopg2 import pool
 from google import genai
 from google.genai import types
 import json
-from io import StringIO
 
 connection_string = st.secrets.connections.neon['url']
 conn_pool = pool.SimpleConnectionPool(1, 10, connection_string)
