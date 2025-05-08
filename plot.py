@@ -15,4 +15,8 @@ raw = cur.fetchone()[0]
 df = pd.DataFrame(raw)
 df['idea_score'] = df['originality']*df['usefulness']
 plotdf = df.groupby('user_id').agg({"is_idea": "sum", "idea_score": "max"})
+st.header("Plot")
 st.scatter_chart(plotdf, x="is_idea", y="idea_score")
+
+st.write("Raw results")
+st.write(df)
