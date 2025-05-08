@@ -13,8 +13,8 @@ user_email = st.session_state.name.lower()
 cur.execute(f"SELECT * FROM chat_logs WHERE chat_logs.user = '{user_email}';")
 dblist = cur.fetchall()
 cur.execute(f"""SELECT "data" FROM system WHERE "id" = 1""")
-raw = cur.fetchone()[0]
-with open('system_instructions/' + raw['system_instruction'],'rb') as f:
+system = cur.fetchone()[0]
+with open('system_instructions/' + system['phase'] + 'chatting.txt','rb') as f:
     system_instruction = f.read().decode("UTF-8")
 
 if len(dblist)==1:
